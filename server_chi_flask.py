@@ -489,7 +489,7 @@ def predict():
             pslog('gop-a', a)
             pslog('gop-b', b)
             pslog('scoremode', scoremode)
-            gopParsed, ctmParsed = parseGOPOutput(dir+'/gop', topN=3, scoremode=scoremode, a=a, b=b)
+            gopParsed, ctmParsed = parseGOPOutput(tmpdir + '/gop', topN=3, scoremode=scoremode, a=a, b=b)
             # gopstring = 'GOP-json:%s' % str(gopParsed)
             # print('gopstring', gopstring)
             pslog('P--5')

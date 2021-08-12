@@ -12,7 +12,7 @@ COPY mixedZhuyin mixedZhuyin
 COPY kaldi_rt kaldi_rt
 COPY server_chi.py ./
 COPY requirements.txt ./
-COPU server_eng_flask.py ./
+COPY server_chi_flask.py ./
 
 # Build project
 RUN pip3 install --upgrade pip setuptools uwsgi
