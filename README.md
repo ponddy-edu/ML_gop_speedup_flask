@@ -1,7 +1,7 @@
 # GOP (english / chinese) docker images build
 
 ### GOP score
-![](https://imgur.com/a/f6iM8he)
+![](https://github.com/ponddy-edu/ML_gop_speedup_flask/blob/develop/media/Gop_score.png?raw=true)
 
 
 ### install docker
