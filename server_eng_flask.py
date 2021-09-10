@@ -646,6 +646,10 @@ def predict():
             if qs.get('ipa_ans', ''):                
                 ipa = qs.get('ipa_ans')
                 pslog('ipa_ans1', ipa)
+                # 將ipa輸入的:ɡ 統一換成 g
+                if ipa.find('ɡ') != -1:
+                    ipa = ipa.replace('ɡ', 'g')
+                    pslog('ipa_ans(replace)', ipa)                
                 # self.wfile.write(str(ipa).encode())
                 # [('I', 'aɪ'), ('LIKE', 'laɪk'), ('TO', 'tuː'), ('DRINK', 'drɪŋk'), ('TEA', 'tiː')]
                 ipa_ans = list(zip(qs.get('txt').split(), ipa.split()))

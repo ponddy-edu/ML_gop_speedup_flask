@@ -573,6 +573,9 @@ class Handler(BaseHTTPRequestHandler):
           word_model = False
           if 'ipa_ans' in qs:
             ipa = qs['ipa_ans'][0]
+            # 將ipa輸入的:ɡ 統一換成 g
+            if ipa.find('ɡ') != -1:
+                ipa = ipa.replace('ɡ', 'g')            
             # self.wfile.write(str(ipa).encode())
             ipa_ans = list(zip(qs['txt'][0].split(), ipa.split()))
           if 'cmu_ans' in qs:
