@@ -10,6 +10,19 @@ sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubun
 sudo apt-get update
 sudo apt-get install docker-ce
 
+### copy nas GOP model to Taipei server
+
+```bash=
+# 先切到台北 ML_gop_speedup 路徑
+cd /opt/deeplearning/ML_gop_speedup
+# 將舊 ponddyEng 資料夾先改名
+mv ponddyEng ponddEng6.7
+
+# 將 nas 的 GOP model 複製到/opt/deeplearning/ML_gop_speedup，並改名為ponddyEng
+sudo rsync -avzh ponddy@68.255.152.146:/media/nas/GOP_models/ponddyEng6.8_api /opt/deeplearning/ML_gop_speedup/
+mv ponddyEng6.8_api/ ponddyEng/
+```
+
 ### build docker image
 
 ```
@@ -37,6 +50,9 @@ sudo docker run --name ponddy_gop_eng_web_flask -d -p 9899:8506 ponddy/gop_eng_f
 sudo docker run --name ponddy_gop_eng_web_flask -p 9899:8506 -v /models/kaldi_wavs:/models/kaldi_wavs ponddy/gop_eng_flask:latest
 # 背景跑
 sudo docker run --name ponddy_gop_eng_web_flask -d -p 9899:8506 -v  /models/kaldi_wavs:/models/kaldi_wavs ponddy/gop_eng_flask:latest
+
+# 執行API checker，確認有無異常
+bash API_checker_local_docker_web_gop-english-post.bat
 
 # 將docker images version 推送到dockerhub上
 sudo docker tag {xxx} ponddy/gop_eng_flask:v1.0
