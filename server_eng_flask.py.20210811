@@ -1,3 +1,4 @@
+from flask import Flask, request, jsonify
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 from urllib.parse import parse_qs
@@ -7,7 +8,13 @@ from collections import deque
 import functools
 import socket
 import traceback
+import base64
+#from flask_apiexceptions import (JSONExceptionHandler, ApiException, ApiError, api_exception_handler)
 
+
+app = Flask(__name__)
+#ext = JSONExceptionHandler(app)
+#ext.register(code_or_exception=ApiException, handler=api_exception_handler)
 # scoremode : angel(天使) / rigorous(嚴謹)
 minscores_rigorous = 80   # 80
 minscores_angel = 60      # 60
@@ -103,15 +110,15 @@ def compute(wav, txt, dir, ipa_ans=None):
     wavscp = dir + '/wav.scp'
     txtark = dir + '/txt.ark'
     with open(wavscp, 'w') as f:
-      f.write('%s /models/kaldi_wavs/%s\n' % (utt, wav))
-
+        f.write('%s /models/kaldi_wavs/%s\n' % (utt, wav))
+    pslog('compute txt', txt)
     with open(txtark, 'w') as f:
-      f.write(utt)
-      for word in txt.split():
-        try:
-          f.write(wordToId[word])
-        except:
-          f.write(mapoov)
+        f.write(utt)
+        for word in txt.split():
+            try:
+               f.write(wordToId[word])
+            except:
+               f.write(mapoov)
 
     os.system("kaldi_rt/bin/compute-mfcc-feats --verbose=2 --config=%s/conf/mfcc_hires.conf scp,p:%s ark:- | kaldi_rt/bin/copy-feats --compress=true ark:- ark,scp:%s/feats.ark,%s/feats.scp" % (prjDir, wavscp, dir, dir))
 
@@ -125,6 +132,8 @@ def compute(wav, txt, dir, ipa_ans=None):
 
     os.system("kaldi_rt/bin/compute-dnn-gop --use-gpu=no %s/exp/nnet3/tdnn_sp/tree %s/exp/nnet3/tdnn_sp/final.mdl %s/lang/L.fst 'ark,s,cs:kaldi_rt/bin/apply-cmvn --norm-means=false --norm-vars=false --utt2spk=ark:0.u2s scp:%s/cmvn.scp scp:%s/feats.scp ark:- |' scp:%s/ivec.scp ark:%s ark,t:%s/gop ark,t:%s/align ark,t:%s/phoneme_ll" % (prjDir, prjDir, prjDir, dir, dir, dir, txtark, dir, dir, dir))
     print('done computing gop.')
+    pslog('SSSSSSSSSSSSSSS')
+
 
 def parseGOPOutput(gopFilePath, ipa_ans=None, cmu_ans = None, topN=3, scoremode='angel', a=1, b=2, word_model=False):
     # ============================== Begin of utility function definition ============================= #
@@ -370,6 +379,7 @@ def parseGOPOutput(gopFilePath, ipa_ans=None, cmu_ans = None, topN=3, scoremode=
     # ================================ End of utility function definitions =========================== #
 
     print('Begin of parseGOPOutput')
+    pslog('Begin of parseGOPOutput----1', gopFilePath)
 
     GOPData = {}
     with open(gopFilePath, 'r') as f:
@@ -417,7 +427,7 @@ def parseGOPOutput(gopFilePath, ipa_ans=None, cmu_ans = None, topN=3, scoremode=
     if len(wb) == 0:
         print('Error!')
         return wordGOP
-
+    pslog('Begin of parseGOPOutput----2')
     total_GOPScore = 0
     total_RRScore = 0
 
@@ -510,6 +520,7 @@ def parseGOPOutput(gopFilePath, ipa_ans=None, cmu_ans = None, topN=3, scoremode=
         wordGOP.append(cur)
         total_word += 1  
 
+    pslog('Begin of parseGOPOutput----3')
     avg_gopscore = int(total_GOPScore / total_word)
     avg_rrscore = int(total_RRScore / total_word)
     #print('avg_gopscore', avg_gopscore)
@@ -527,6 +538,7 @@ def parseGOPOutput(gopFilePath, ipa_ans=None, cmu_ans = None, topN=3, scoremode=
     gopdic['sentScores'] = round(sum(wordScoresList)/len(wordScoresList), 2)
     #print('gopdic', gopdic)
 
+    pslog('Begin of parseGOPOutput----4')
     wordCTM = []
     pairs = deque(list(zip(GOPData['phones'], GOPData['phoneGOPs'], GOPData['phoneRRs'], GOPData['intervals'], GOPData['predictPhone'])))
     wb = matchWord(GOPData['words'], pairs)
@@ -543,6 +555,7 @@ def parseGOPOutput(gopFilePath, ipa_ans=None, cmu_ans = None, topN=3, scoremode=
         cur['beg'] = min(x[0] for x in intervalBuf)
         cur['end'] = max(x[1] for x in intervalBuf)
         wordCTM.append(cur)
+    pslog('Begin of parseGOPOutput----5')
     return gopdic, wordCTM
 
 
@@ -552,64 +565,94 @@ def pslog(msg, msg1=''):
     if os.environ.get('pslogobtime', ''):
         import time
         ptime = time.time()
-        wf.write('%s--%s:%s' % (ptime, msg, msg1))
+        wf.write('%s--%s:%s\n' % (ptime, msg, msg1))
     else:
-        wf.write('%s:%s' % (msg, msg1))
+        wf.write('%s:%s\n' % (msg, msg1))
     wf.close()
 
 
-class Handler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        tm1 = time.time()
-        self.send_response(200)
-        self.end_headers()
-        dir = str(threading.get_ident())
-        os.mkdir(dir)
+def handle_uploaded_file_base64(imgstring, UPLOAD_PATH='/models/kaldi_wavs/'):
+    import base64
+    timeseries = int(round(time.time() * 1000000000))
+    wavfilename = 'upload_%s.wav' % (timeseries)
+    fileabspath = '%s%s' % (UPLOAD_PATH, wavfilename)    
+    imgdata = base64.b64decode(imgstring)
+    with open(fileabspath, "wb") as fh:
+        fh.write(imgdata)    
+    return fileabspath
 
+
+@app.route('/', methods=['POST'])
+def predict():
+
+    # dir = str(threading.get_ident())
+    # dir = str(int(round(time.time() * 10000000000)))
+    dir = str(threading.get_ident())
+    pslog('dir', dir)
+    os.mkdir(dir)
+    # error_gop = ApiError(code='gopscore', message='process can not complete gop score.')
+    if request.method == 'POST':
+        qs = request.form
+        # word = request.form.get('word')
+        # print('qs', qs)
         try:
-          qs = parse_qs(self.path[self.path.index('?')+1:])
-          compute(qs['wav'][0], qs['txt'][0], dir)
-          ipa_ans, cmu_ans = None, None
-          word_model = False
-          if 'ipa_ans' in qs:
-            ipa = qs['ipa_ans'][0]
-            # 將ipa輸入的:ɡ 統一換成 g
-            if ipa.find('ɡ') != -1:
-                ipa = ipa.replace('ɡ', 'g')            
-            # self.wfile.write(str(ipa).encode())
-            ipa_ans = list(zip(qs['txt'][0].split(), ipa.split()))
-          if 'cmu_ans' in qs:
-            cmu = qs['cmu_ans'][0].split()
-            # self.wfile.write(str(ipa).encode())
-            cmu = [x.split('_') for x in cmu]
-            cmu_ans = list(zip(qs['txt'][0].split(), cmu))
-          if 'word_model' in qs:
-            word_model = bool(qs['word_model'][0])
-          try:
-              scoremode = qs['scoremode'][0]
-          except: scoremode = 'angel'           
-          try:
-              a, b = float(qs['a'][0]), float(qs['b'][0])
-          except: a, b = 1, 2
-          gopParsed, ctmParsed = parseGOPOutput(dir+'/gop', ipa_ans=ipa_ans, cmu_ans=cmu_ans, scoremode=scoremode, a=a, b=b, word_model=word_model)
-          gopstring = 'GOP-json:%s' % str(gopParsed)
-          self.wfile.write(str(gopstring).encode())
-          self.wfile.write(b'\n')
-          ctmstring = 'CTM-json:%s' % str(ctmParsed)
-          self.wfile.write(str(ctmstring).encode())
-          
-        except Exception as e:
-          errMsg = traceback.format_exc()
-          #self.wfile.write(b'Failed')
-          self.wfile.write(str.encode(errMsg))          
+            pslog('P--1')
+            base64_file_path = ''   
+            if qs.get('base64'):
+                pslog('cond--1', qs.get('txt'))
+                base64_file_path = handle_uploaded_file_base64(qs.get('base64'))
+                pslog('base64_file_path', base64_file_path)
+                fh, ft = os.path.split(base64_file_path)
+                pslog('ft', ft)
+                compute(ft, qs.get('txt'), dir)            
+            else:
+                pslog('cond-2', qs.get('txt'))
+                compute(qs.get('wav'), qs.get('txt'), dir)
+            pslog('P--2')        
+            ipa_ans, cmu_ans = None, None
+            word_model = False
+            if 'ipa_ans' in qs:
+                ipa = qs.get('ipa_ans')
+                # self.wfile.write(str(ipa).encode())
+                ipa_ans = list(zip(qs.get('txt').split(), ipa.split()))
+            pslog('P--3')        
+            if 'cmu_ans' in qs:
+                cmu = qs.get('cmu_ans').split()
+                # self.wfile.write(str(ipa).encode())
+                cmu = [x.split('_') for x in cmu]
+                cmu_ans = list(zip(qs.get('txt').split(), cmu))
+            if 'word_model' in qs:
+                word_model = bool(qs.get('word_model'))
+            try:
+                scoremode = qs.get('scoremode')
+            except: scoremode = 'angel'
+            pslog('P--4')        
+            try:
+                a, b = float(qs.get('a')), float(qs.get('b'))
+            except: a, b = 1, 2
+            pslog('ipa_ans', ipa_ans)
+            pslog('cmu_ans', cmu_ans)
+            pslog('scoremode', scoremode)
+            gopParsed, ctmParsed = parseGOPOutput(dir+'/gop', ipa_ans=ipa_ans, cmu_ans=cmu_ans, scoremode=scoremode, a=a, b=b, word_model=word_model)
+            # gopstring = 'GOP-json:%s' % str(gopParsed)
+            # print('gopstring', gopstring)
+            pslog('P--5')
+            # self.wfile.write(str(gopstring).encode())
+            ctmstring = 'CTM-json:%s' % str(ctmParsed)
+            # 移除base64 生成的檔案
+            if os.path.isfile(base64_file_path):                
+                try:
+                    pslog('remove file', base64_file_path)
+                    os.remove(base64_file_path)
+                except: pass
+            shutil.rmtree(dir)
+            return jsonify({"error": False, "gop": gopParsed, "ctm": ctmParsed, "err_msg": None})
+        except:
+            # raise ApiException(status_code=422, error=error_gop)
+            shutil.rmtree(dir)
+        
+        return jsonify({"error": True, "err_msg": "Gop json can not generate!"})
 
-        shutil.rmtree(dir)
-        fin = '\n===---===spend time(Chinese GOP):%f\n' % (time.time()-tm1)
-        self.wfile.write(fin.encode())
-
-class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
-    """Handle requests in a separate thread."""
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     init()
-    ThreadedHTTPServer(('', 8506), Handler).serve_forever()
+    app.run(host='0.0.0.0', port=8506, debug=True)

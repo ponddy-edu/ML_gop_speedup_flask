@@ -1,0 +1,68 @@
+# ML_gop_speedup
+
+### install docker
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+sudo apt-get update
+sudo apt-get install docker-ce
+
+### build docker image
+Chinese:
+sudo docker build -t gop_chi -f Dockerfile.chi .
+English:
+sudo docker build -t gop_eng -f dockerfile.eng .
+
+### start docker container as a service
+Chinese:
+sudo docker run -d -p8080:8080 -v /home/ubuntu/work/wavs:/data:ro gop_chi
+English:
+sudo docker run -d -p8081:8081 -v /home/ubuntu/work/wavs:/data:ro gop_eng
+
+
+### REST api:     http://localhost:8080
+### Parameters:   wav=filename (files stored in work/wavs directory)
+###               txt=reference_text (replace ' ' by + or %20)
+Chinese:
+curl "http://localhost:8080/?wav=001.wav&txt=ta+men+dou+shi+da+xue+sheng+ma"
+English:
+curl "http://localhost:8081/?wav=eng001new.wav&txt=I+LIKE+TO+DRINK+TEA"
+
+### speed test, same as before
+python3 pressure_gop_run.py 10 dnn 
+python3 pressure_gop_count.py
+
+Other detailed information, please refer to [here](https://docs.google.com/document/d/1eL6OpnCFIFxHbpSVcF61yMJHrjhu1C2Qhx5MuBiGE30)
+
+# Docker to docker hub and integrate to Ponddy-api
+
+## Gop chinese docker steps
+```
+(step.1) From Dockerfile to generate docker image
+ sudo docker build --no-cache -t "ponddy/gop_chi" -f Dockerfile.chi .
+(step.2) testing for docker container as server
+ sudo docker run --name ponddy_gop_chi_web -d -p 9889:8505 -v  /models/kaldi_wavs:/models/kaldi_wavs  ponddy/gop_chi:latest
+ curl "http://localhost:9889/?wav=001.wav&txt=ta+men+dou+shi+da+xue+sheng+ma"
+(step.3) push docker image to docker hub
+ sudo docker tag {image hash code} ponddy/gop_chi:latest
+ sudo docker push ponddy/gop_chi:latest
+(step.4) view image in docker hub
+ https://hub.docker.com/repository/docker/ponddy/gop_chi
+(step.5) integrate to Ponddy-api github
+ https://github.com/ponddy-edu/Ponddy-API  
+```
+
+## Gop english docker steps
+```
+(step.1) From Dockerfile to generate docker image
+ sudo docker build --no-cache -t "ponddy/gop_eng" -f Dockerfile.eng .
+(step.2) testing for docker container as server
+ sudo docker run --name ponddy_gop_eng_web -d -p 9890:8506 -v  /models/kaldi_wavs:/models/kaldi_wavs  ponddy/gop_eng:latest
+ curl "http://localhost:9890/?wav=eng001new.wav&txt=I+LIKE+TO+DRINK+TEA"
+(step.3) push docker image to docker hub
+ sudo docker tag {image hash code} ponddy/gop_eng:latest
+ sudo docker push ponddy/gop_eng:latest
+(step.4) view image in docker hub
+ https://hub.docker.com/repository/docker/ponddy/gop_eng
+(step.5) integrate to Ponddy-api github
+ https://github.com/ponddy-edu/Ponddy-API
+```

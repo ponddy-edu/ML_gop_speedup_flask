@@ -1,0 +1,30 @@
+### install docker
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+sudo apt-get update
+sudo apt-get install docker-ce
+
+### build docker image
+Chinese:
+sudo docker build -t gop_chi -f Dockerfile.chi .
+English:
+sudo docker build -t gop_eng -f dockerfile.eng .
+
+### start docker container as a service
+Chinese:
+sudo docker run -d -p8080:8080 -v /home/ubuntu/work/wavs:/data:ro gop_chi
+English:
+sudo docker run -d -p8081:8081 -v /home/ubuntu/work/wavs:/data:ro gop_eng
+
+
+### REST api:     http://localhost:8080
+### Parameters:   wav=filename (files stored in work/wavs directory)
+###               txt=reference_text (replace ' ' by + or %20)
+Chinese:
+curl "http://localhost:8080/?wav=001.wav&txt=ta+men+dou+shi+da+xue+sheng+ma"
+English:
+curl "http://localhost:8081/?wav=eng001new.wav&txt=I+LIKE+TO+DRINK+TEA"
+
+### speed test, same as before
+python3 pressure_gop_run.py 10 dnn 
+python3 pressure_gop_count.py

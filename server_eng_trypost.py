@@ -1,12 +1,13 @@
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, parse_qsl
 import threading
 import time, os, shutil
 from collections import deque
 import functools
 import socket
 import traceback
+from cgi import parse_header
 
 # scoremode : angel(天使) / rigorous(嚴謹)
 minscores_rigorous = 80   # 80
@@ -558,58 +559,95 @@ def pslog(msg, msg1=''):
     wf.close()
 
 
+def handle_uploaded_file_base64(imgstring, UPLOAD_PATH='/models/kaldi_wavs/'):
+    import base64
+    timeseries = int(round(time.time() * 100000000))
+    wavfilename = 'upload_%s.jpg' % (timeseries)
+    fileabspath = '%s%s' % (UPLOAD_PATH, wavfilename)  
+    imgdata = base64.b64decode(imgstring)
+    with open(fileabspath, "wb") as fh:
+        fh.write(imgdata)    
+    return fileabspath
+
+
 class Handler(BaseHTTPRequestHandler):
+
+    def dofunc(self, qs):
+        try:
+            print('qs2-2', qs)
+            if qs.get('base64'):
+                print('cond--1')
+                base64_file_path = handle_uploaded_file_base64(qs.get('base64'))
+                print('base64_file_path', base64_file_path)
+                compute(base64_file_path, qs['txt'][0], dir)
+            else:
+                print('cond--2')
+                compute(qs['wav'][0], qs['txt'][0], dir)
+            ipa_ans, cmu_ans = None, None
+            word_model = False
+            if 'ipa_ans' in qs:
+                ipa = qs['ipa_ans'][0]
+                # self.wfile.write(str(ipa).encode())
+                ipa_ans = list(zip(qs['txt'][0].split(), ipa.split()))
+            if 'cmu_ans' in qs:
+                cmu = qs['cmu_ans'][0].split()
+                # self.wfile.write(str(ipa).encode())
+                cmu = [x.split('_') for x in cmu]
+                cmu_ans = list(zip(qs['txt'][0].split(), cmu))
+            if 'word_model' in qs:
+                word_model = bool(qs['word_model'][0])
+            try:
+                scoremode = qs['scoremode'][0]
+            except: scoremode = 'angel'           
+            try:
+                a, b = float(qs['a'][0]), float(qs['b'][0])
+            except: a, b = 1, 2
+            gopParsed, ctmParsed = parseGOPOutput(dir+'/gop', ipa_ans=ipa_ans, cmu_ans=cmu_ans, scoremode=scoremode, a=a, b=b, word_model=word_model)
+            gopstring = 'GOP-json:%s' % str(gopParsed)
+            self.wfile.write(str(gopstring).encode())
+            self.wfile.write(b'\n')
+            ctmstring = 'CTM-json:%s' % str(ctmParsed)
+            self.wfile.write(str(ctmstring).encode())
+          
+        except Exception as e:
+            errMsg = traceback.format_exc()
+            #self.wfile.write(b'Failed')
+            self.wfile.write(str.encode(errMsg))          
+            shutil.rmtree(dir)
+            fin = '\n===---===spend time(Chinese GOP):%f\n' % (time.time()-tm1)
+            self.wfile.write(fin.encode())
+
+    def do_POST(self):
+        tm1 = time.time()
+        self.send_response(200)
+        self.end_headers()
+        ctype, pdict = parse_header(self.headers['content-type'])
+        if ctype == 'application/x-www-form-urlencoded':
+            print('cond-2')
+            length = int(self.headers['content-length'])            
+            lines = self.rfile.read(length)
+            qsl = parse_qsl(lines)
+            qs = {}
+            for k, v in qsl:        
+                qs[k.decode('ascii')] = [str(v[0])]
+            print('qs11', qs)
+        else:
+            qs = {}
+        self.dofunc(qs)
+
     def do_GET(self):
         tm1 = time.time()
         self.send_response(200)
         self.end_headers()
         dir = str(threading.get_ident())
         os.mkdir(dir)
+        qs = parse_qs(self.path[self.path.index('?')+1:])
+        self.dofunc(qs)
 
-        try:
-          qs = parse_qs(self.path[self.path.index('?')+1:])
-          compute(qs['wav'][0], qs['txt'][0], dir)
-          ipa_ans, cmu_ans = None, None
-          word_model = False
-          if 'ipa_ans' in qs:
-            ipa = qs['ipa_ans'][0]
-            # 將ipa輸入的:ɡ 統一換成 g
-            if ipa.find('ɡ') != -1:
-                ipa = ipa.replace('ɡ', 'g')            
-            # self.wfile.write(str(ipa).encode())
-            ipa_ans = list(zip(qs['txt'][0].split(), ipa.split()))
-          if 'cmu_ans' in qs:
-            cmu = qs['cmu_ans'][0].split()
-            # self.wfile.write(str(ipa).encode())
-            cmu = [x.split('_') for x in cmu]
-            cmu_ans = list(zip(qs['txt'][0].split(), cmu))
-          if 'word_model' in qs:
-            word_model = bool(qs['word_model'][0])
-          try:
-              scoremode = qs['scoremode'][0]
-          except: scoremode = 'angel'           
-          try:
-              a, b = float(qs['a'][0]), float(qs['b'][0])
-          except: a, b = 1, 2
-          gopParsed, ctmParsed = parseGOPOutput(dir+'/gop', ipa_ans=ipa_ans, cmu_ans=cmu_ans, scoremode=scoremode, a=a, b=b, word_model=word_model)
-          gopstring = 'GOP-json:%s' % str(gopParsed)
-          self.wfile.write(str(gopstring).encode())
-          self.wfile.write(b'\n')
-          ctmstring = 'CTM-json:%s' % str(ctmParsed)
-          self.wfile.write(str(ctmstring).encode())
-          
-        except Exception as e:
-          errMsg = traceback.format_exc()
-          #self.wfile.write(b'Failed')
-          self.wfile.write(str.encode(errMsg))          
-
-        shutil.rmtree(dir)
-        fin = '\n===---===spend time(Chinese GOP):%f\n' % (time.time()-tm1)
-        self.wfile.write(fin.encode())
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     """Handle requests in a separate thread."""
 
 if __name__ == '__main__':
-    init()
+    # init()
     ThreadedHTTPServer(('', 8506), Handler).serve_forever()

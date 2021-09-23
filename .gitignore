@@ -3,3 +3,13 @@ mixedZhuyin/
 wavs/
 kaldi_rt/
 
+mixed*
+ponddy*
+
+0.conf
+0.u2s
+0.s2u
+22369871906560/txt.ark
+22369871906560/wav.scp
+22528582182656/txt.ark
+22528582182656/wav.scp
