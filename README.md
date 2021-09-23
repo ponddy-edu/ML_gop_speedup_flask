@@ -10,7 +10,7 @@ sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubun
 sudo apt-get update
 sudo apt-get install docker-ce
 
-### copy nas GOP model to Taipei server
+### copy NAS GOP model to Taipei server
 
 ```bash=
 # 先切到台北 ML_gop_speedup 路徑
@@ -55,11 +55,16 @@ sudo docker run --name ponddy_gop_eng_web_flask -d -p 9899:8506 -v  /models/kald
 bash API_checker_local_docker_web_gop-english-post.bat
 
 # 將docker images version 推送到dockerhub上
-sudo docker tag {xxx} ponddy/gop_eng_flask:v1.0
-sudo docker tag {xxx} ponddy/gop_eng_flask:latest
+sudo docker tag {IMAGE ID} ponddy/gop_eng_flask:v1.0
+sudo docker tag {IMAGE ID} ponddy/gop_eng_flask:latest
 sudo docker push ponddy/gop_eng_flask:v1.0
 sudo docker push ponddy/gop_eng_flask:latest
 ```
+
+#### 更新ML版號紀錄
+
+[ML模型版號紀錄](https://docs.google.com/spreadsheets/d/142uhBXcScwvFSOqFkwgPvBijZPJGB4RZXilQ3_ARadc/edit#gid=194926086)
+
 
 #### Chinese
 
@@ -82,3 +87,7 @@ sudo docker tag {xxx} ponddy/gop_chi_flask:latest
 sudo docker push ponddy/gop_chi_flask:v1.0
 sudo docker push ponddy/gop_chi_flask:latest
 ```
+
+#### 更新ML版號紀錄
+
+[ML模型版號紀錄](https://docs.google.com/spreadsheets/d/142uhBXcScwvFSOqFkwgPvBijZPJGB4RZXilQ3_ARadc/edit#gid=194926086)
